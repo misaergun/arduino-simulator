@@ -271,6 +271,15 @@ void loop() {
               : String(mode).toUpperCase();
           this.pins[pin].mode = m;
           console.log("[SIM] pinMode(" + pin + ") ->", m);
+          // INPUT_PULLUP: default to HIGH
+          if (m === "INPUT_PULLUP") {
+            if (
+              typeof this.pins[pin].value === "undefined" ||
+              this.pins[pin].value === 0
+            ) {
+              this.pins[pin].value = 1;
+            }
+          }
           this.updatePinDisplay();
         }
 
@@ -326,6 +335,7 @@ void loop() {
             .replace(/\bHIGH\b/g, "1")
             .replace(/\bLOW\b/g, "0")
             .replace(/\bOUTPUT\b/g, "'OUTPUT'")
+            .replace(/\bINPUT_PULLUP\b/g, "'INPUT_PULLUP'")
             .replace(/\bINPUT\b/g, "'INPUT'")
             // Convert C++ variable declarations (int, float, bool) to JS `let` for simple declarations.
             // Avoid converting function signatures by ensuring the identifier is not followed by `(`.
@@ -433,9 +443,24 @@ void loop() {
         const setPin = (v) => {
           const sim = window.currentSim;
           if (!sim) return;
+          // Determine new logical value depending on pull-up mode.
+          const mode = (sim.pins[2] && sim.pins[2].mode) || "INPUT";
+          let newVal;
+          if (String(mode).toUpperCase() === "INPUT_PULLUP") {
+            // Pull-up: released => HIGH (1), pressed => LOW (0)
+            newVal = v ? 0 : 1;
+          } else {
+            // Normal input: pressed => HIGH (1), released => LOW (0)
+            newVal = v ? 1 : 0;
+          }
           const old = (sim.pins[2] && sim.pins[2].value) || 0;
-          sim.setPinValue(2, v ? 1 : 0);
-          console.log("[INPUT] UI set pin 2 ->", sim.pins[2].value);
+          sim.setPinValue(2, newVal);
+          console.log(
+            "[INPUT] UI set pin 2 ->",
+            sim.pins[2].value,
+            "(mode:",
+            mode + ")",
+          );
           if (old !== sim.pins[2].value)
             console.log(
               "[INPUT] pin 2 changed from",
@@ -443,7 +468,7 @@ void loop() {
               "to",
               sim.pins[2].value,
             );
-          // UI feedback
+          // UI feedback reflects the actual pin value (HIGH/LOW)
           const label = document.getElementById("btn-2-state");
           const btnEl = document.getElementById("btn-2");
           if (label) label.textContent = sim.pins[2].value ? "HIGH" : "LOW";
