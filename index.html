@@ -1,0 +1,375 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Virtual Arduino Simulator</title>
+
+    <style>
+      :root {
+        --bg: #f5f5f5;
+        --panel: #fff;
+        --muted: #666;
+        --accent: #2b6df6;
+      }
+      html,
+      body {
+        height: 100%;
+      }
+      body {
+        font-family: Inter, Arial, sans-serif;
+        padding: 18px;
+        margin: 0;
+        background: var(--bg);
+        color: #222;
+      }
+
+      .app {
+        max-width: 1100px;
+        margin: 18px auto;
+      }
+      h2 {
+        margin: 0 0 12px;
+      }
+
+      .workspace {
+        display: flex;
+        gap: 18px;
+      }
+      .editor-panel {
+        flex: 1;
+        min-width: 360px;
+        background: var(--panel);
+        padding: 12px;
+        border-radius: 8px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+      }
+      .sim-panel {
+        width: 360px;
+        background: var(--panel);
+        padding: 12px;
+        border-radius: 8px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+      }
+
+      textarea#code {
+        width: 100%;
+        height: 360px;
+        font-family: monospace;
+        font-size: 13px;
+        border: 1px solid #e6e6e6;
+        padding: 8px;
+        border-radius: 6px;
+      }
+
+      .toolbar {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        margin-top: 10px;
+      }
+      .btn {
+        background: var(--accent);
+        color: #fff;
+        border: none;
+        padding: 8px 12px;
+        border-radius: 6px;
+        cursor: pointer;
+      }
+      .btn.secondary {
+        background: #eee;
+        color: #222;
+      }
+      .btn.small {
+        padding: 6px 8px;
+        font-size: 13px;
+      }
+
+      .led {
+        width: 68px;
+        height: 68px;
+        border-radius: 50%;
+        margin: 10px auto;
+        background: #666;
+        transition: 200ms;
+      }
+      .led.on {
+        background: crimson;
+        box-shadow: 0 0 24px rgba(220, 20, 60, 0.8);
+      }
+
+      #pin-table table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      #pin-table th,
+      #pin-table td {
+        border: 1px solid #eee;
+        padding: 6px 8px;
+        font-size: 13px;
+        text-align: left;
+      }
+      #pin-table th {
+        background: #fafafa;
+        color: var(--muted);
+      }
+
+      #serial {
+        background: #0b0b0b;
+        color: #b9f29a;
+        padding: 8px;
+        height: 180px;
+        overflow: auto;
+        font-family: monospace;
+        font-size: 13px;
+        border-radius: 6px;
+      }
+
+      .meta-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-top: 8px;
+      }
+      .status {
+        font-size: 13px;
+        color: var(--muted);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <h2>Virtual Arduino Simulator</h2>
+
+      <div class="workspace">
+        <div class="editor-panel">
+          <label><strong>Sketch</strong></label>
+          <textarea id="code">
+void setup() {
+  pinMode(13, OUTPUT);
+}
+
+void loop() {
+  digitalWrite(13, HIGH);
+  delay(500);
+  digitalWrite(13, LOW);
+  delay(500);
+}
+</textarea
+          >
+
+          <div class="toolbar">
+            <button class="btn" id="runBtn" onclick="runCode()">Run</button>
+            <button class="btn secondary" onclick="stopCode()">Stop</button>
+            <button class="btn secondary small" onclick="clearSerial()">
+              Clear Serial
+            </button>
+            <button class="btn secondary small" onclick="copyCode()">
+              Copy Code
+            </button>
+            <div style="flex: 1"></div>
+            <div class="status" id="status">Status: Stopped</div>
+          </div>
+        </div>
+
+        <div class="sim-panel">
+          <div style="text-align: center">
+            <div id="led" class="led" aria-hidden="true"></div>
+            <div style="font-size: 13px; color: var(--muted)">Pin 13 (LED)</div>
+          </div>
+
+          <div style="margin-top: 12px">
+            <h4 style="margin: 0 0 8px">Pin States</h4>
+            <div id="pin-table"></div>
+          </div>
+          <div style="margin-top:12px">
+            <h4 style="margin:0 0 8px">Inputs</h4>
+            <div style="display:flex;gap:12px;align-items:center">
+              <div>
+                <button id="btn-2" class="btn secondary">Button (pin 2)</button>
+                <div style="font-size:12px;color:var(--muted)">Hold to set HIGH</div>
+              </div>
+            </div>
+          </div>
+
+          <div style="margin-top: 12px">
+            <h4 style="margin: 0 0 8px">Serial Console</h4>
+            <div id="serial"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // =========================
+      // SIMULATOR
+      // =========================
+      class ArduinoSimulator {
+        constructor() {
+          this.pins = {};
+          this.serialEl = document.getElementById("serial");
+          this.pinTableEl = document.getElementById("pin-table");
+          // initialize digital pins 0-13
+          for (let i = 0; i <= 13; i++) {
+            this.pins[i] = { mode: "INPUT", value: 0 };
+          }
+          this.updatePinDisplay();
+        }
+
+          // read digital pin
+          digitalRead(pin) {
+            if (!this.pins[pin]) return 0;
+            return this.pins[pin].value || 0;
+          }
+
+        pinMode(pin, mode) {
+          this.pins[pin] = this.pins[pin] || {};
+          this.pins[pin].mode = mode;
+          if (typeof this.pins[pin].value === "undefined")
+            this.pins[pin].value = 0;
+          this.updatePinDisplay();
+        }
+
+        digitalWrite(pin, value) {
+          if (!this.pins[pin]) this.pins[pin] = { mode: "OUTPUT", value: 0 };
+          this.pins[pin].value = value;
+          // LED for pin 13
+          if (parseInt(pin, 10) === 13) {
+            const led = document.getElementById("led");
+            if (value === 1) led.classList.add("on");
+            else led.classList.remove("on");
+          }
+          this.updatePinDisplay();
+        }
+
+        delay(ms) {
+          return new Promise((res) => setTimeout(res, ms));
+        }
+
+        serialPrint(text) {
+          if (!this.serialEl) return;
+          const span = document.createElement("div");
+          span.textContent = String(text);
+          this.serialEl.appendChild(span);
+          this.serialEl.scrollTop = this.serialEl.scrollHeight;
+        }
+
+        updatePinDisplay() {
+          if (!this.pinTableEl) return;
+          const keys = Object.keys(this.pins)
+            .map((k) => parseInt(k, 10))
+            .filter((n) => !isNaN(n))
+            .sort((a, b) => a - b);
+          let html = "<table><tr><th>Pin</th><th>Mode</th><th>Value</th></tr>";
+          for (const k of keys) {
+            const p = this.pins[k];
+            html += `<tr><td>${k}</td><td>${p.mode}</td><td>${p.value}</td></tr>`;
+          }
+          html += "</table>";
+          this.pinTableEl.innerHTML = html;
+        }
+      }
+
+      // =========================
+      // TRANSFORM
+      // =========================
+      function transform(code) {
+        return code
+          .replace(/void\s+setup\s*\(\s*\)/g, "async function setup()")
+          .replace(/void\s+loop\s*\(\s*\)/g, "async function loop()")
+          .replace(/\bHIGH\b/g, "1")
+          .replace(/\bLOW\b/g, "0")
+          .replace(/\bOUTPUT\b/g, "'OUTPUT'")
+          .replace(/\bINPUT\b/g, "'INPUT'")
+          .replace(/delay\s*\(/g, "await delay(");
+      }
+
+      // =========================
+      // RUN / UI Helpers
+      // =========================
+      function setStatus(text) {
+        const el = document.getElementById("status");
+        if (el) el.textContent = "Status: " + text;
+      }
+
+      async function runCode() {
+        // stop previous run if any
+        stopCode();
+
+        setStatus("Running");
+        const userCode = document.getElementById("code").value;
+        const sim = new ArduinoSimulator();
+        window.currentSim = sim;
+
+        const transformed = transform(userCode);
+
+        try {
+          const wrapper = new Function(
+            "sim",
+            `
+            return (async () => {
+              const pinMode = sim.pinMode.bind(sim);
+              const digitalWrite = sim.digitalWrite.bind(sim);
+              const delay = sim.delay.bind(sim);
+              const Serial = { print: sim.serialPrint.bind(sim), println: (t)=>sim.serialPrint(String(t)) };
+              const digitalRead = sim.digitalRead.bind(sim);
+              ${transformed}
+              if (typeof setup === 'function') await setup();
+              return { loop: (typeof loop === 'function') ? loop.bind(null) : null };
+            })();
+          `,
+          );
+
+          const result = await wrapper(sim);
+
+          if (!result || typeof result.loop !== "function") {
+            setStatus("No loop() defined");
+            return;
+          }
+
+          sim._running = true;
+          const loopFunc = result.loop;
+
+          async function loopStep() {
+            if (!sim._running) return;
+            try {
+              await loopFunc();
+            } catch (e) {
+              sim._running = false;
+              window.currentSim = null;
+              setStatus("Error");
+              alert(
+                "Runtime error in loop(): " + (e && e.message ? e.message : e),
+              );
+              return;
+            }
+            if (sim._running) setTimeout(loopStep, 0);
+          }
+
+          setTimeout(loopStep, 0);
+        } catch (err) {
+          setStatus("Error");
+          alert("Error: " + err.message);
+        }
+      }
+
+      function stopCode() {
+        if (window.currentSim) {
+          window.currentSim._running = false;
+          window.currentSim = null;
+        }
+        setStatus("Stopped");
+      }
+
+      function clearSerial() {
+        const el = document.getElementById("serial");
+        if (el) el.innerHTML = "";
+      }
+
+      function copyCode() {
+        const code = document.getElementById("code");
+        if (!code) return;
+        navigator.clipboard?.writeText(code.value).catch(() => {});
+      }
+    </script>
+  </body>
+</html>
