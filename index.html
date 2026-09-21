@@ -263,6 +263,12 @@ void loop() {
           this.updatePinDisplay();
         }
 
+        // milliseconds since simulation start
+        millis() {
+          if (typeof this._startTime === "undefined") return 0;
+          return Math.floor(performance.now() - this._startTime);
+        }
+
         pinMode(pin, mode) {
           this.pins[pin] = this.pins[pin] || { mode: "INPUT", value: 0 };
           const m =
@@ -362,6 +368,8 @@ void loop() {
         setStatus("Running");
         const userCode = document.getElementById("code").value;
         const sim = new ArduinoSimulator();
+        // mark simulation start time for millis()
+        sim._startTime = performance.now();
         window.currentSim = sim;
 
         const transformed = transform(userCode);
@@ -374,6 +382,7 @@ void loop() {
               const pinMode = sim.pinMode.bind(sim);
               const digitalWrite = sim.digitalWrite.bind(sim);
               const delay = sim.delay.bind(sim);
+              const millis = sim.millis.bind(sim);
               const Serial = { print: sim.serialPrint.bind(sim), println: (t)=>sim.serialPrint(String(t)) };
               const digitalRead = sim.digitalRead.bind(sim);
               ${transformed}
