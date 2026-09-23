@@ -180,6 +180,9 @@ void loop() {
           <div style="text-align: center">
             <div id="led" class="led" aria-hidden="true"></div>
             <div style="font-size: 13px; color: var(--muted)">Pin 13 (LED)</div>
+            <div id="led-pwm" style="font-size: 12px; color: var(--muted)">
+              PWM: 0
+            </div>
           </div>
 
           <div style="margin-top: 12px">
@@ -203,6 +206,36 @@ void loop() {
                 </div>
                 <div style="font-size: 12px; color: var(--muted)">
                   Hold to set HIGH
+                </div>
+              </div>
+              <div
+                style="
+                  display: flex;
+                  flex-direction: column;
+                  gap: 6px;
+                  margin-left: 14px;
+                "
+              >
+                <label style="font-size: 13px; margin: 0">Analog A0</label>
+                <div style="display: flex; gap: 8px; align-items: center">
+                  <input
+                    id="slider-a0"
+                    type="range"
+                    min="0"
+                    max="1023"
+                    value="0"
+                  />
+                  <div
+                    id="a0-val"
+                    style="
+                      width: 42px;
+                      font-size: 12px;
+                      color: var(--muted);
+                      text-align: right;
+                    "
+                  >
+                    0
+                  </div>
                 </div>
               </div>
             </div>
@@ -230,6 +263,10 @@ void loop() {
             this.pins[i] = { mode: "INPUT", value: 0 };
           }
           this.updatePinDisplay();
+          // LED animation state
+          this._ledIntensity = 0; // current visual intensity 0..1
+          this._ledTarget = 0; // desired intensity 0..1
+          this._ledAnimRunning = false;
         }
 
         // read digital pin
@@ -254,13 +291,100 @@ void loop() {
                 " → " +
                 this.pins[pin].value,
             );
-          // LED handling for pin 13
+          // LED handling for pin 13: animate brightness smoothly
           if (parseInt(pin, 10) === 13) {
-            const led = document.getElementById("led");
-            if (this.pins[pin].value === 1) led.classList.add("on");
-            else led.classList.remove("on");
+            const pwm =
+              typeof this.pins[pin].pwm === "number"
+                ? this.pins[pin].pwm
+                : this.pins[pin].value
+                  ? 255
+                  : 0;
+            const intensity = Math.max(0, Math.min(1, pwm / 255));
+            this._setLedTarget(intensity);
+            const pwmLabel = document.getElementById("led-pwm");
+            if (pwmLabel) pwmLabel.textContent = "PWM: " + pwm;
           }
           this.updatePinDisplay();
+        }
+
+        _updateLedVisual(intensity) {
+          const led = document.getElementById("led");
+          if (!led) return;
+          if (intensity > 0) led.classList.add("on");
+          else led.classList.remove("on");
+          led.style.opacity = String(intensity);
+          led.style.boxShadow = `0 0 ${8 + intensity * 32}px rgba(220,20,60,${0.6 * intensity})`;
+        }
+
+        _setLedTarget(target) {
+          this._ledTarget = Math.max(0, Math.min(1, target));
+          if (this._ledAnimRunning) return;
+          this._ledAnimRunning = true;
+          const step = () => {
+            // simple easing towards target
+            const diff = this._ledTarget - this._ledIntensity;
+            this._ledIntensity += diff * 0.25;
+            if (Math.abs(diff) < 0.005) this._ledIntensity = this._ledTarget;
+            this._updateLedVisual(this._ledIntensity);
+            if (this._ledIntensity !== this._ledTarget)
+              requestAnimationFrame(step);
+            else this._ledAnimRunning = false;
+          };
+          requestAnimationFrame(step);
+        }
+
+        // analog (PWM) write for pins (0-255)
+        analogWrite(pin, value) {
+          this.pins[pin] = this.pins[pin] || { mode: "OUTPUT", value: 0 };
+          const raw = Number(value);
+          const pwm = Number.isFinite(raw)
+            ? Math.max(0, Math.min(255, Math.floor(raw)))
+            : 0;
+          // store pwm value on pin but don't override digital value or mode
+          this.pins[pin].pwm = pwm;
+          console.log("[SIM] analogWrite(" + pin + ") ->", pwm);
+          // reflect to LED (pin 13): ensure setPinValue is called to refresh UI
+          if (parseInt(pin, 10) === 13)
+            this.setPinValue(pin, this.pins[pin].value || (pwm > 0 ? 1 : 0));
+        }
+
+        // analog pins storage & access
+        analogPins = {};
+
+        setAnalogValue(pin, value) {
+          // accept A0..A5 or numeric pins (e.g., 14..19)
+          const p = String(pin).toUpperCase();
+          let key = p;
+          const m = /^A(\d+)$/i.exec(p);
+          if (m) {
+            // map A0..A5 -> 14..19
+            const idx = Number(m[1]);
+            key = String(14 + idx);
+          } else if (!isNaN(Number(pin))) {
+            key = String(Number(pin));
+          }
+          this.analogPins[key] = Math.max(
+            0,
+            Math.min(1023, Number(value) || 0),
+          );
+        }
+
+        analogRead(pin) {
+          // support A0..A5 constants (string or identifier mapping)
+          const p = String(pin).toUpperCase();
+          let key = p;
+          const m = /^A(\d+)$/i.exec(p);
+          if (m) {
+            key = String(14 + Number(m[1]));
+          } else if (!isNaN(Number(pin))) {
+            key = String(Number(pin));
+          }
+          const v = this.analogPins[key];
+          console.log(
+            "[SIM] analogRead(" + pin + ") ->",
+            v === undefined ? 0 : v,
+          );
+          return v === undefined ? 0 : v;
         }
 
         // milliseconds since simulation start
@@ -343,6 +467,13 @@ void loop() {
             .replace(/\bOUTPUT\b/g, "'OUTPUT'")
             .replace(/\bINPUT_PULLUP\b/g, "'INPUT_PULLUP'")
             .replace(/\bINPUT\b/g, "'INPUT'")
+            // Map analog names A0..A5 to numeric pins 14..19
+            .replace(/\bA0\b/g, "14")
+            .replace(/\bA1\b/g, "15")
+            .replace(/\bA2\b/g, "16")
+            .replace(/\bA3\b/g, "17")
+            .replace(/\bA4\b/g, "18")
+            .replace(/\bA5\b/g, "19")
             // Convert C++ variable declarations (int, float, bool) to JS `let` for simple declarations.
             // Avoid converting function signatures by ensuring the identifier is not followed by `(`.
             .replace(
@@ -383,6 +514,8 @@ void loop() {
               const digitalWrite = sim.digitalWrite.bind(sim);
               const delay = sim.delay.bind(sim);
               const millis = sim.millis.bind(sim);
+              const analogRead = sim.analogRead.bind(sim);
+              const analogWrite = sim.analogWrite.bind(sim);
               const Serial = { print: sim.serialPrint.bind(sim), println: (t)=>sim.serialPrint(String(t)) };
               const digitalRead = sim.digitalRead.bind(sim);
               ${transformed}
@@ -509,6 +642,20 @@ void loop() {
           setPin(1);
         });
         window.addEventListener("touchend", () => setPin(0));
+
+        // analog A0 slider wiring
+        const a0 = document.getElementById("slider-a0");
+        const a0Val = document.getElementById("a0-val");
+        if (a0 && a0Val) {
+          a0.addEventListener("input", (e) => {
+            const val = Number(e.target.value || 0);
+            a0Val.textContent = String(val);
+            const sim = window.currentSim;
+            if (!sim) return;
+            // store under 'A0' key
+            sim.setAnalogValue("A0", val);
+          });
+        }
       })();
     </script>
   </body>
