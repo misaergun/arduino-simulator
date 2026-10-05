@@ -1,6 +1,7 @@
 import { runCode, stopCode, simEvents } from "../runtime/runner.js";
 import { attachInputControls } from "./controls.js";
-import { renderLed, createPinTable } from "./render.js";
+import { renderComponents, resetBuzzers, createPinTable } from "./render.js";
+import { unlockAudio } from "./audio.js";
 
 const PIN_EVENTS = ["pinChanged", "analogChanged", "modeChanged", "analogInputChanged"];
 const WARNING_DURATION_MS = 2500;
@@ -58,12 +59,12 @@ function bindSimulator(sim) {
   const pinTable = $("pin-table");
   const renderPinTable = pinTable ? createPinTable(pinTable) : () => {};
 
-  // LED first and isolated, so a table problem can never freeze it
+  // components first and isolated, so a table problem can never freeze them
   const onPinChanged = () => {
     try {
-      renderLed(sim);
+      renderComponents(sim);
     } catch (e) {
-      console.error("LED render failed", e);
+      console.error("Component render failed", e);
     }
     try {
       renderPinTable(sim.snapshotPins());
@@ -85,6 +86,8 @@ function bindSimulator(sim) {
 }
 
 async function run() {
+  // must run inside the click, before any await, to count as a user gesture
+  unlockAudio();
   setStatus("Starting");
   try {
     detachRun();
@@ -110,7 +113,10 @@ function init() {
   $("copyCodeBtn")?.addEventListener("click", copyCode);
 
   simEvents.addEventListener("sim:started", () => setStatus("Running"));
-  simEvents.addEventListener("sim:stopped", () => setStatus("Stopped"));
+  simEvents.addEventListener("sim:stopped", () => {
+    setStatus("Stopped");
+    resetBuzzers(); // a stopped sketch must never leave a tone running
+  });
   simEvents.addEventListener("sim:error", (ev) => {
     const err = ev.detail && ev.detail.error;
     setStatus("Error");

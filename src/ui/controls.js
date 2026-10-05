@@ -1,16 +1,19 @@
 const BUTTON_PIN = 2;
+const SWITCH_PIN = 4;
 const ANALOG_PIN = "A0";
 
 /**
- * Connects the on-screen inputs (push button on pin 2, slider on A0) to a
- * simulator instance. Returns a function that disconnects them again.
+ * Connects the on-screen inputs (push button on pin 2, toggle switch on pin 4,
+ * slider on A0) to a simulator instance. Returns a function that disconnects them again.
  */
 export function attachInputControls(sim) {
   const button = document.getElementById("btn-2");
   const buttonState = document.getElementById("btn-2-state");
   const slider = document.getElementById("slider-a0");
   const sliderValue = document.getElementById("a0-val");
-  if (!button && !slider) return () => {};
+  const toggle = document.getElementById("switch-4");
+  const toggleState = document.getElementById("switch-4-state");
+  if (!button && !slider && !toggle) return () => {};
 
   const setPressed = (pressed) => {
     // with INPUT_PULLUP a pressed button pulls the pin LOW
@@ -30,18 +33,27 @@ export function attachInputControls(sim) {
 
   // [target, event, handler]. Pointer events cover mouse and touch; the
   // mouse/touch pair is only a fallback for browsers without them.
-  const listeners = window.PointerEvent
-    ? [
-        [button, "pointerdown", press],
-        [window, "pointerup", release],
-        [button, "pointercancel", release],
-      ]
-    : [
-        [button, "mousedown", press],
-        [window, "mouseup", release],
-        [button, "touchstart", press],
-        [window, "touchend", release],
-      ];
+  const listeners = !button
+    ? []
+    : window.PointerEvent
+      ? [
+          [button, "pointerdown", press],
+          [window, "pointerup", release],
+          [button, "pointercancel", release],
+        ]
+      : [
+          [button, "mousedown", press],
+          [window, "mouseup", release],
+          [button, "touchstart", press],
+          [window, "touchend", release],
+        ];
+
+  // a toggle switch latches: checked drives the pin HIGH, unchecked LOW
+  const onToggle = () => {
+    sim.setPinValue(SWITCH_PIN, toggle.checked ? 1 : 0);
+    if (toggleState) toggleState.textContent = sim.getPin(SWITCH_PIN).value ? "HIGH" : "LOW";
+  };
+  if (toggle) listeners.push([toggle, "change", onToggle]);
 
   const onSliderInput = (e) => {
     const value = Number(e.target.value || 0);
@@ -56,8 +68,9 @@ export function attachInputControls(sim) {
     target.addEventListener(type, handler, options);
   }
 
-  // start the sim with the slider's current position, not 0
+  // start the sim with the slider's and switch's current positions, not 0
   if (slider) sim.setAnalogValue(ANALOG_PIN, Number(slider.value || 0));
+  if (toggle) onToggle();
 
   return function detach() {
     for (const [target, type, handler] of listeners) {

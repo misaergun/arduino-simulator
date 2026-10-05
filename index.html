@@ -41,10 +41,21 @@ void loop() {
         </div>
 
         <div class="sim-panel">
-          <div class="led-block">
-            <div id="led" class="led" aria-hidden="true"></div>
-            <div class="caption">Pin 13 (LED)</div>
-            <div id="led-pwm" class="hint">PWM: 0</div>
+          <div class="components">
+            <div class="led-block">
+              <div id="led-13" class="led" data-pin="13" aria-hidden="true"></div>
+              <div class="caption">Pin 13 (LED)</div>
+              <div id="led-13-pwm" class="hint">PWM: 0</div>
+            </div>
+            <div class="led-block">
+              <div id="led-12" class="led" data-pin="12" aria-hidden="true"></div>
+              <div class="caption">Pin 12 (LED)</div>
+              <div id="led-12-pwm" class="hint">PWM: 0</div>
+            </div>
+            <div class="led-block">
+              <div id="buzzer-8" class="buzzer" data-pin="8" role="status">silent</div>
+              <div class="caption">Pin 8 (Buzzer)</div>
+            </div>
           </div>
 
           <section class="section">
@@ -63,6 +74,17 @@ void loop() {
                   <div id="btn-2-state" class="hint">LOW</div>
                 </div>
                 <div class="hint">Hold to set HIGH</div>
+              </div>
+              <div>
+                <div class="row">
+                  <label class="switch">
+                    <input id="switch-4" type="checkbox" />
+                    <span class="switch-track" aria-hidden="true"></span>
+                    Switch (pin 4)
+                  </label>
+                  <div id="switch-4-state" class="hint">LOW</div>
+                </div>
+                <div class="hint">Click to toggle</div>
               </div>
               <div class="analog-input">
                 <label for="slider-a0" class="input-label">Analog A0</label>

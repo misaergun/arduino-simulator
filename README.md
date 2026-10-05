@@ -7,10 +7,12 @@ A browser-based Arduino simulator. Write a sketch in Arduino-style C, press **Ru
 - **Arduino-style sketches** — `setup()` / `loop()` with `int`, `float`, `bool` declarations and `for (int i = 0; ...)` loops.
 - **Digital I/O** — `pinMode`, `digitalWrite`, `digitalRead` with `INPUT`, `OUTPUT` and `INPUT_PULLUP`.
 - **Analog I/O** — `analogRead(A0)` returns 0–1023 from the on-screen slider; `analogWrite(pin, 0–255)` drives PWM.
-- **PWM LED** — the pin 13 LED shows brightness proportional to the PWM value, or full on/off for digital writes.
+- **PWM LEDs** — LEDs on pins 13 and 12 (`#led-13`, `#led-12`) fade smoothly with the PWM value: opacity and a red glow scale with `analogWrite` duty (0–255), and `digitalWrite` gives full on/off.
+- **Buzzer** — a buzzer on pin 8 plays a 900 Hz tone and lights up with a pulsing ring while the pin is HIGH, and goes silent on LOW or when the sketch stops. Audio is enabled by the **Run** click, since browsers block sound until a user gesture. `BEEP` is also logged to the browser console each time it starts.
 - **Timing** — `delay(ms)` and `millis()`.
 - **Serial console** — `Serial.begin`, `Serial.print`, `Serial.println`.
-- **Inputs** — a push button on pin 2 (hold for HIGH) and an analog slider on A0.
+- **Inputs** — a push button on pin 2 (hold for HIGH), a toggle switch on pin 4 (on = HIGH, off = LOW) and an analog slider on A0.
+- **Extensible components** — output components are discovered from the HTML: add an element with `class="led"` (or `buzzer`), `id="led-<pin>"` and `data-pin="<pin>"` and it is driven automatically.
 - **Live pin table** — mode and value of every used pin, updated as the sketch runs.
 - **Safe execution** — sketches run in a Web Worker, so the page stays responsive. A sketch that blocks (e.g. `while (true) {}`) is stopped automatically after about one second with an error.
 - **Robust input handling** — out-of-range or invalid values (`NaN`, negative, too large) are clamped instead of crashing the simulator.
@@ -72,6 +74,25 @@ void loop() {
   analogWrite(13, sensor / 4);
   Serial.println(sensor);
   delay(100);
+}
+```
+
+**Switch → LEDs and buzzer** (flip the pin 4 switch)
+
+```cpp
+void setup() {
+  pinMode(4, INPUT);
+  pinMode(12, OUTPUT);
+  pinMode(13, OUTPUT);
+  pinMode(8, OUTPUT);
+}
+
+void loop() {
+  int on = digitalRead(4);
+  digitalWrite(13, on);
+  digitalWrite(8, on);
+  analogWrite(12, on ? 0 : 60);
+  delay(50);
 }
 ```
 

@@ -1,22 +1,60 @@
-const LED_PIN = 13;
+import { setTone } from "./audio.js";
 
 const isAnalogKey = (key) => /^A\d+$/.test(key);
 
 // Digital pins first (numeric order), then analog pins A0, A1, ...
 const pinOrder = (key) => (isAnalogKey(key) ? 1000 + Number(key.slice(1)) : Number(key));
 
-/** Shows the LED pin's state: brightness from its PWM duty cycle, else full on/off. */
-export function renderLed(sim) {
-  const led = document.getElementById("led");
-  const pwmLabel = document.getElementById("led-pwm");
-  const pin = sim.getPin(LED_PIN);
-  const brightness = pin.pwm > 0 ? pin.pwm / 255 : pin.value > 0 ? 1 : 0;
+/**
+ * Drives the LED element `#led-<pin>` from a PWM value (0..255): on when
+ * pwm > 0, with opacity and glow scaled by pwm / 255 (see `.led` in style.css).
+ */
+export function updateLED(pin, pwm) {
+  const led = document.getElementById("led-" + pin);
+  if (!led) return;
+  const duty = Math.min(255, Math.max(0, Number(pwm) || 0));
+  led.style.setProperty("--brightness", String(duty / 255));
+  led.classList.toggle("on", duty > 0);
+}
 
-  if (led) {
-    led.style.setProperty("--brightness", String(brightness));
-    led.classList.toggle("on", brightness > 0);
+/**
+ * Shows buzzer `#buzzer-<pin>` sounding while its pin is HIGH and plays its
+ * tone. Acts only on a state change, so "BEEP" is logged once per start.
+ */
+export function updateBuzzer(pin, on) {
+  const el = document.getElementById("buzzer-" + pin);
+  if (!el || el.classList.contains("on") === on) return;
+  el.classList.toggle("on", on);
+  el.textContent = on ? "BEEP" : "silent";
+  if (on) console.log(`BEEP (pin ${pin})`);
+  setTone(pin, on);
+}
+
+/** Silences every buzzer, e.g. when the sketch stops. */
+export function resetBuzzers() {
+  for (const buzzer of document.querySelectorAll(".buzzer[data-pin]")) {
+    updateBuzzer(buzzer.dataset.pin, false);
   }
-  if (pwmLabel) pwmLabel.textContent = "PWM: " + (pin.pwm || 0);
+}
+
+/**
+ * Updates every output component on the page from the simulator's pin state.
+ * Components are discovered from the DOM (`.led[data-pin]`, `.buzzer[data-pin]`),
+ * so adding one only takes an HTML element.
+ */
+export function renderComponents(sim) {
+  for (const led of document.querySelectorAll(".led[data-pin]")) {
+    const pinNo = led.dataset.pin;
+    const pin = sim.getPin(pinNo);
+    // analogWrite sets pin.pwm; digitalWrite clears it and sets value 0/1
+    updateLED(pinNo, pin.pwm > 0 ? pin.pwm : pin.value > 0 ? 255 : 0);
+    const pwmLabel = document.getElementById(`led-${pinNo}-pwm`);
+    if (pwmLabel) pwmLabel.textContent = "PWM: " + (pin.pwm || 0);
+  }
+  for (const buzzer of document.querySelectorAll(".buzzer[data-pin]")) {
+    const pinNo = buzzer.dataset.pin;
+    updateBuzzer(pinNo, sim.getPin(pinNo).value > 0);
+  }
 }
 
 /**
