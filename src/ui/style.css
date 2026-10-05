@@ -20,8 +20,59 @@ body {
   max-width: 1100px;
   margin: 18px auto;
 }
-h2 {
-  margin: 0 0 12px;
+.app-header {
+  margin: 0 0 20px;
+}
+.app-title {
+  display: inline-block;
+  margin: 0;
+  font-size: clamp(1.75rem, 1.1rem + 2.4vw, 2.6rem);
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: 0.02em;
+  /* drop-shadow, not text-shadow: text-shadow would show through the transparent gradient glyphs */
+  filter: drop-shadow(0 2px 10px rgba(43, 109, 246, 0.25));
+  transition: transform 200ms ease-out, filter 200ms ease-out;
+}
+.app-title:hover {
+  transform: translateY(-2px);
+  filter: drop-shadow(0 4px 14px rgba(43, 109, 246, 0.35));
+}
+.app-title-light,
+.app-title-main {
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+}
+.app-title-light {
+  font-weight: 500;
+  background-image: linear-gradient(90deg, #4ea3f0, #3a86e0);
+}
+.app-title-main {
+  background-image: linear-gradient(90deg, #4fb3ff, #2b6df6 55%, #1a4fc4);
+}
+/* gradient accent line under the title */
+.app-title::after {
+  content: "";
+  display: block;
+  width: 80px;
+  height: 4px;
+  margin-top: 10px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, #4fb3ff, #2b6df6);
+}
+.app-subtitle {
+  margin: 10px 0 0;
+  font-size: 14px;
+  color: var(--muted);
+}
+@media (prefers-reduced-motion: reduce) {
+  .app-title {
+    transition: none;
+  }
+  .app-title:hover {
+    transform: none;
+  }
 }
 
 .workspace {
@@ -37,76 +88,497 @@ h2 {
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
 }
 .sim-panel {
-  width: 360px;
+  width: 460px;
   background: var(--panel);
   padding: 12px;
   border-radius: 8px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
 }
 
-textarea#code {
-  width: 100%;
-  height: 360px;
-  font-family: monospace;
+/* ---- code editor (textarea over a highlighted <pre>, see editor.js) ---- */
+.code-editor {
+  --editor-bg: #1e1e1e;
+  --editor-line: 20px;
+  --editor-pad: 12px;
+  --editor-font: "JetBrains Mono", "Fira Code", ui-monospace, SFMono-Regular, Menlo, Consolas,
+    "Courier New", monospace;
+  display: flex;
+  flex-direction: column;
+  height: 380px;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--editor-bg);
+  border: 1px solid #2d2d2d;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  transition: box-shadow 180ms ease, border-color 180ms ease;
+}
+.code-editor:focus-within {
+  border-color: #2b6df6;
+  box-shadow:
+    0 0 0 3px rgba(43, 109, 246, 0.25),
+    0 2px 8px rgba(0, 0, 0, 0.12);
+}
+
+.editor-topbar {
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+  height: 36px;
+  padding: 0 12px;
+  background: #252526;
+  border-bottom: 1px solid #1a1a1a;
+  flex-shrink: 0;
+}
+.editor-dots {
+  display: flex;
+  gap: 6px;
+  align-self: center;
+}
+.editor-dots i {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #ff5f57;
+}
+.editor-dots i:nth-child(2) {
+  background: #febc2e;
+}
+.editor-dots i:nth-child(3) {
+  background: #28c840;
+}
+.editor-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 14px;
+  border-radius: 6px 6px 0 0;
+  background: var(--editor-bg);
+  border-top: 2px solid #2b6df6;
+  color: #e6e6e6;
+  font: 12px var(--editor-font);
+  cursor: text;
+}
+.editor-tab-icon {
+  width: 10px;
+  height: 10px;
+  fill: #00979d;
+}
+
+.editor-body {
+  position: relative;
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  box-shadow: inset 0 6px 8px -6px rgba(0, 0, 0, 0.6);
+}
+.editor-gutter,
+.editor-highlight,
+.code-editor textarea {
+  margin: 0;
+  font-family: var(--editor-font);
   font-size: 13px;
-  border: 1px solid #e6e6e6;
-  padding: 8px;
-  border-radius: 6px;
+  line-height: var(--editor-line);
+  font-variant-ligatures: none;
+  tab-size: 2;
+}
+.editor-gutter {
+  width: 48px;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  /* extra bottom room so it can scroll as far as the textarea */
+  padding: var(--editor-pad) 12px calc(var(--editor-pad) + 20px) 0;
+  overflow: hidden;
+  text-align: right;
+  color: #6e7681;
+  user-select: none;
+}
+.editor-gutter span {
+  display: block;
+}
+.editor-gutter span.active {
+  color: #c6c6c6;
+}
+.editor-code {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+/* the highlighted copy and the textarea must share the exact same box */
+.editor-highlight,
+.code-editor textarea {
+  position: absolute;
+  inset: 0;
+  box-sizing: border-box;
+  padding: var(--editor-pad) var(--editor-pad) calc(var(--editor-pad) + 20px) 4px;
+  border: 0;
+  white-space: pre;
+  overflow-wrap: normal;
+}
+.editor-highlight {
+  overflow: hidden;
+  color: #d4d4d4;
+  pointer-events: none;
+}
+.code-editor textarea {
+  width: 100%;
+  height: 100%;
+  resize: none;
+  outline: none;
+  overflow: auto;
+  background: transparent;
+  color: transparent;
+  caret-color: #aeafad;
+  color-scheme: dark;
+}
+.code-editor textarea::selection {
+  background: rgba(64, 128, 255, 0.35);
+}
+.editor-active-line {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--editor-line);
+  background: rgba(255, 255, 255, 0.045);
+  opacity: 0;
+  pointer-events: none;
+}
+.code-editor:focus-within .editor-active-line {
+  opacity: 1;
+}
+
+/* syntax colours (VS Code Dark+) */
+.tok-keyword {
+  color: #569cd6;
+}
+.tok-function {
+  color: #dcdcaa;
+}
+.tok-constant {
+  color: #4fc1ff;
+}
+.tok-builtin {
+  color: #4ec9b0;
+}
+.tok-number {
+  color: #f0a35e;
+}
+.tok-string {
+  color: #ce9178;
+}
+.tok-comment {
+  color: #6a9955;
+  font-style: italic;
+}
+.tok-preproc {
+  color: #c586c0;
 }
 
 .toolbar {
   display: flex;
-  gap: 8px;
+  flex-wrap: wrap;
+  gap: 10px;
   align-items: center;
-  margin-top: 10px;
+  margin-top: 12px;
 }
 .btn {
-  background: var(--accent);
-  color: #fff;
-  border: none;
-  padding: 8px 12px;
-  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  font: 500 13px/1.2 Inter, Arial, sans-serif;
   cursor: pointer;
+  transition:
+    transform 180ms ease,
+    box-shadow 180ms ease,
+    background-color 180ms ease,
+    border-color 180ms ease;
 }
+.btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.btn-icon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+.btn-icon.stroke {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.btn.primary {
+  color: #fff;
+  background: linear-gradient(135deg, #4f9bff, #2b6df6 55%, #1f55d6);
+  box-shadow:
+    0 1px 2px rgba(16, 24, 40, 0.15),
+    0 4px 12px rgba(43, 109, 246, 0.35);
+}
+.btn.primary:hover {
+  transform: translateY(-1px) scale(1.03);
+  box-shadow:
+    0 2px 4px rgba(16, 24, 40, 0.15),
+    0 8px 20px rgba(43, 109, 246, 0.45);
+}
+.btn.primary:active {
+  transform: scale(0.97);
+  box-shadow: 0 1px 4px rgba(43, 109, 246, 0.35);
+}
+
 .btn.secondary {
-  background: #eee;
-  color: #222;
+  color: #2a2f36;
+  background: #f6f7f9;
+  border-color: #e3e6ea;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05);
 }
-.btn.secondary.active {
-  background: #d6d6d6;
-  transform: translateY(1px);
-  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.06);
+.btn.secondary:hover {
+  background: #eef0f3;
+  border-color: #d5d9df;
+  transform: translateY(-1px);
+  box-shadow: 0 3px 8px rgba(16, 24, 40, 0.08);
 }
-.btn.small {
-  padding: 6px 8px;
-  font-size: 13px;
+.btn.secondary:active {
+  background: #e6e9ed;
+  transform: translateY(0) scale(0.98);
+  box-shadow: inset 0 1px 2px rgba(16, 24, 40, 0.08);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn,
+  .btn:hover,
+  .btn:active {
+    transform: none;
+  }
 }
 
 .led {
   /* --brightness (0..1) is set from JS (updateLED) as pwm / 255 */
   --brightness: 0;
-  width: 68px;
-  height: 68px;
-  border-radius: 50%;
-  margin: 10px auto;
-  background-color: #5a1e1e;
-  opacity: 0.35;
-  box-shadow: inset 0 -6px 10px rgba(0, 0, 0, 0.25);
+  --led-on: #ff1f1f;
+  --led-off: #6b1d1d;
+  --led-glow: 255, 40, 40;
+  position: relative;
+  width: 26px;
+  height: 32px;
+  margin: 2px auto 6px;
+  /* 5 mm LED: round dome on top, flat base */
+  border-radius: 13px 13px 3px 3px;
+  background-color: var(--led-off);
+  /* static specular highlight over a colour that can transition */
+  background-image: radial-gradient(
+    circle at 35% 28%,
+    rgba(255, 255, 255, 0.8) 0 10%,
+    rgba(255, 255, 255, 0.18) 28%,
+    transparent 60%
+  );
+  opacity: 0.5;
+  box-shadow: inset 0 -5px 7px rgba(0, 0, 0, 0.3);
   transition:
     opacity 120ms ease-out,
     background-color 120ms ease-out,
     box-shadow 120ms ease-out;
 }
+/* the LED's base flange */
+.led::after {
+  content: "";
+  position: absolute;
+  left: -3px;
+  right: -3px;
+  bottom: -4px;
+  height: 5px;
+  border-radius: 2px;
+  background-color: inherit;
+  box-shadow: inset 0 -2px 2px rgba(0, 0, 0, 0.35);
+}
 .led.on {
-  background-color: #ff1f1f;
+  background-color: var(--led-on);
   /* never fully transparent, so a low duty cycle still reads as a dim LED */
-  opacity: calc(0.35 + var(--brightness) * 0.65);
+  opacity: calc(0.5 + var(--brightness) * 0.5);
   box-shadow:
-    inset 0 -6px 10px rgba(0, 0, 0, 0.15),
-    0 0 calc(var(--brightness) * 12px) calc(var(--brightness) * 4px)
-      rgba(255, 40, 40, calc(var(--brightness) * 0.9)),
-    0 0 calc(var(--brightness) * 36px) calc(var(--brightness) * 12px)
-      rgba(255, 0, 0, calc(var(--brightness) * 0.45));
+    inset 0 -5px 7px rgba(0, 0, 0, 0.15),
+    0 0 calc(var(--brightness) * 10px) calc(var(--brightness) * 3px)
+      rgba(var(--led-glow), calc(var(--brightness) * 0.9)),
+    0 0 calc(var(--brightness) * 30px) calc(var(--brightness) * 10px)
+      rgba(var(--led-glow), calc(var(--brightness) * 0.45));
+}
+/* surface-mount "L" LED on the board */
+.led.led-smd {
+  --led-on: #ffb300;
+  --led-off: #8a6a24;
+  --led-glow: 255, 179, 0;
+  width: 14px;
+  height: 8px;
+  margin: 0;
+  border-radius: 2px;
+  background-image: none;
+  box-shadow: none;
+}
+.led.led-smd::after {
+  display: none;
+}
+
+/* ---- hardware stage ---- */
+.hardware {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 2950 / 2900;
+  border-radius: 8px;
+  /* breadboard-like dot grid behind the parts */
+  background:
+    radial-gradient(circle, #d9dde2 1px, transparent 1.5px) 0 0 / 12px 12px,
+    #f7f8fa;
+}
+.board-art {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.pcb {
+  fill: #0d7a83;
+  stroke: #0a5f66;
+  stroke-width: 12;
+}
+.pcb-line {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.25);
+  stroke-width: 8;
+}
+.mount-hole {
+  fill: #f7f8fa;
+  stroke: #c9a227;
+  stroke-width: 22;
+}
+.chip {
+  fill: #1e1e1e;
+}
+.chip-legs {
+  stroke: #c9cdd2;
+  stroke-width: 40;
+  stroke-dasharray: 40 60;
+  stroke-dashoffset: -30;
+}
+.chip-text {
+  fill: #8b8f94;
+  font: 600 70px monospace;
+  text-anchor: middle;
+}
+.smd-dim {
+  fill: #8a6a24;
+}
+.silk {
+  fill: rgba(255, 255, 255, 0.92);
+  font: 600 55px Inter, Arial, sans-serif;
+}
+.silk-pin {
+  font-size: 44px;
+}
+.silk-pin-small {
+  font-size: 34px;
+}
+.silk-title {
+  text-anchor: middle;
+  font-size: 60px;
+}
+.silk-logo {
+  text-anchor: middle;
+  font-size: 240px;
+  font-style: italic;
+  font-weight: 800;
+  letter-spacing: 12px;
+  opacity: 0.85;
+}
+.header-strip {
+  fill: #1a1a1a;
+}
+.header-hole {
+  fill: #4b4b4b;
+  stroke: #c9a227;
+  stroke-width: 6;
+}
+.wire,
+.wire-shadow {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.wire {
+  stroke-width: 24;
+}
+.wire-shadow {
+  stroke: rgba(0, 0, 0, 0.25);
+  stroke-width: 34;
+}
+.wire-plug {
+  fill: #222;
+}
+
+.part {
+  position: absolute;
+  /* anchored at its bottom centre, where its wire leaves it */
+  transform: translate(-50%, -100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  white-space: nowrap;
+}
+.part.onboard {
+  transform: translate(-50%, -50%);
+}
+.part-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: #333;
+}
+.part .hint {
+  font-size: 10px;
+  margin-bottom: 3px;
+}
+
+.tact-btn {
+  position: relative;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: none;
+  border-radius: 5px;
+  background: #2a2a2a;
+  box-shadow: 0 2px 3px rgba(0, 0, 0, 0.3);
+  cursor: pointer;
+  touch-action: none;
+}
+.tact-btn::after {
+  content: "";
+  position: absolute;
+  inset: 6px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 40% 35%, #6a6a6a, #3a3a3a 70%);
+  transition: transform 60ms ease-out;
+}
+.tact-btn.active::after {
+  transform: scale(0.88);
+  background: radial-gradient(circle at 40% 35%, #4a4a4a, #222 70%);
+}
+.tact-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
 }
 
 #pin-table table {
@@ -152,28 +624,20 @@ textarea#code {
   margin: 0 0 8px;
 }
 
-.components {
-  display: flex;
-  justify-content: space-around;
-  gap: 8px;
-}
-.led-block {
-  text-align: center;
-}
-
-/* same footprint as .led so the component row lines up */
+/* piezo buzzer: black disc with a centre port */
 .buzzer {
   position: relative;
-  width: 68px;
-  height: 68px;
-  margin: 10px auto;
+  width: 40px;
+  height: 40px;
+  margin: 0 auto 2px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #2b2b2b;
+  background: radial-gradient(circle, #000 0 3px, #2b2b2b 4px 60%, #1c1c1c 61%);
   color: #888;
-  font-size: 12px;
+  font-size: 8px;
+  text-transform: uppercase;
   font-weight: 600;
   opacity: 0.55;
   transition:
@@ -182,8 +646,7 @@ textarea#code {
     box-shadow 120ms ease-out;
 }
 .buzzer.on {
-  background: #f5a623;
-  color: #222;
+  color: #f5a623;
   box-shadow: 0 0 16px 4px rgba(245, 166, 35, 0.55);
   opacity: 1;
   animation: buzz 120ms linear infinite;
@@ -261,10 +724,6 @@ textarea#code {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
-.caption {
-  font-size: 13px;
-  color: var(--muted);
-}
 .hint {
   font-size: 12px;
   color: var(--muted);
@@ -301,4 +760,17 @@ textarea#code {
   padding: 8px;
   border-radius: 4px;
   margin: 8px 0;
+}
+
+/* stack editor and hardware on narrow screens */
+@media (max-width: 880px) {
+  .workspace {
+    flex-direction: column;
+  }
+  .editor-panel {
+    min-width: 0;
+  }
+  .sim-panel {
+    width: auto;
+  }
 }

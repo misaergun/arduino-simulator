@@ -2,6 +2,8 @@ import { runCode, stopCode, simEvents } from "../runtime/runner.js";
 import { attachInputControls } from "./controls.js";
 import { renderComponents, resetBuzzers, createPinTable } from "./render.js";
 import { unlockAudio } from "./audio.js";
+import { layoutBoard } from "./board-layout.js";
+import { initEditor } from "./editor.js";
 
 const PIN_EVENTS = ["pinChanged", "analogChanged", "modeChanged", "analogInputChanged"];
 const WARNING_DURATION_MS = 2500;
@@ -107,6 +109,9 @@ function stop() {
 }
 
 function init() {
+  layoutBoard($("hardware"));
+  initEditor($("code"));
+
   $("runBtn")?.addEventListener("click", run);
   $("stopBtn")?.addEventListener("click", stop);
   $("clearSerialBtn")?.addEventListener("click", clearSerial);

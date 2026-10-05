@@ -6,15 +6,16 @@ const isAnalogKey = (key) => /^A\d+$/.test(key);
 const pinOrder = (key) => (isAnalogKey(key) ? 1000 + Number(key.slice(1)) : Number(key));
 
 /**
- * Drives the LED element `#led-<pin>` from a PWM value (0..255): on when
- * pwm > 0, with opacity and glow scaled by pwm / 255 (see `.led` in style.css).
+ * Drives every LED wired to `pin` (`.led[data-pin="<pin>"]`, e.g. #led-13 and
+ * the onboard L LED) from a PWM value (0..255): on when pwm > 0, with opacity
+ * and glow scaled by pwm / 255 (see `.led` in style.css).
  */
 export function updateLED(pin, pwm) {
-  const led = document.getElementById("led-" + pin);
-  if (!led) return;
   const duty = Math.min(255, Math.max(0, Number(pwm) || 0));
-  led.style.setProperty("--brightness", String(duty / 255));
-  led.classList.toggle("on", duty > 0);
+  for (const led of document.querySelectorAll(`.led[data-pin="${pin}"]`)) {
+    led.style.setProperty("--brightness", String(duty / 255));
+    led.classList.toggle("on", duty > 0);
+  }
 }
 
 /**
@@ -43,8 +44,9 @@ export function resetBuzzers() {
  * so adding one only takes an HTML element.
  */
 export function renderComponents(sim) {
-  for (const led of document.querySelectorAll(".led[data-pin]")) {
-    const pinNo = led.dataset.pin;
+  const ledPins = new Set();
+  for (const led of document.querySelectorAll(".led[data-pin]")) ledPins.add(led.dataset.pin);
+  for (const pinNo of ledPins) {
     const pin = sim.getPin(pinNo);
     // analogWrite sets pin.pwm; digitalWrite clears it and sets value 0/1
     updateLED(pinNo, pin.pwm > 0 ? pin.pwm : pin.value > 0 ? 255 : 0);

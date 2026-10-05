@@ -7,12 +7,39 @@
   </head>
   <body>
     <div class="app">
-      <h2>Virtual Arduino Simulator</h2>
+      <header class="app-header">
+        <h1 class="app-title">
+          <span class="app-title-light">Virtual</span>
+          <span class="app-title-main">Arduino Simulator</span>
+        </h1>
+        <p class="app-subtitle">Simulate Arduino circuits directly in your browser</p>
+      </header>
 
       <div class="workspace">
         <div class="editor-panel">
-          <label for="code"><strong>Sketch</strong></label>
-          <textarea id="code">
+          <div class="code-editor">
+            <div class="editor-topbar">
+              <span class="editor-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+              <label for="code" class="editor-tab">
+                <svg class="editor-tab-icon" viewBox="0 0 16 16" aria-hidden="true">
+                  <circle cx="8" cy="8" r="6" />
+                </svg>
+                sketch.ino
+              </label>
+            </div>
+            <div class="editor-body">
+              <div class="editor-gutter" aria-hidden="true"></div>
+              <div class="editor-code">
+                <div class="editor-active-line" aria-hidden="true"></div>
+                <pre class="editor-highlight" aria-hidden="true"></pre>
+                <textarea
+                  id="code"
+                  wrap="off"
+                  spellcheck="false"
+                  autocomplete="off"
+                  autocorrect="off"
+                  autocapitalize="off"
+                >
 void setup() {
   pinMode(13, OUTPUT);
 }
@@ -24,15 +51,36 @@ void loop() {
   delay(500);
 }
 </textarea
-          >
+                >
+              </div>
+            </div>
+          </div>
 
           <div class="toolbar">
-            <button class="btn" id="runBtn">Run</button>
-            <button class="btn secondary" id="stopBtn">Stop</button>
-            <button class="btn secondary small" id="clearSerialBtn">
+            <button class="btn primary" id="runBtn">
+              <svg class="btn-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M7 4.5v15l12-7.5z" fill="currentColor" />
+              </svg>
+              Run
+            </button>
+            <button class="btn secondary" id="stopBtn">
+              <svg class="btn-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor" />
+              </svg>
+              Stop
+            </button>
+            <button class="btn secondary" id="clearSerialBtn">
+              <svg class="btn-icon stroke" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="m7 21-4.3-4.3a2.4 2.4 0 0 1 0-3.4l9.6-9.6a2.4 2.4 0 0 1 3.4 0l5.6 5.6a2.4 2.4 0 0 1 0 3.4L13 21" />
+                <path d="M22 21H7M5 11l9 9" />
+              </svg>
               Clear Serial
             </button>
-            <button class="btn secondary small" id="copyCodeBtn">
+            <button class="btn secondary" id="copyCodeBtn">
+              <svg class="btn-icon stroke" viewBox="0 0 24 24" aria-hidden="true">
+                <rect x="8" y="2" width="8" height="4" rx="1" />
+                <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+              </svg>
               Copy Code
             </button>
             <div class="spacer"></div>
@@ -41,53 +89,107 @@ void loop() {
         </div>
 
         <div class="sim-panel">
-          <div class="components">
-            <div class="led-block">
+          <!-- Stage coordinates: 2950 x 2900 units, board at (200, 760), 1 unit = 1 mil.
+               Parts are placed by board-layout.js from data-x / data-y and wired to data-wire. -->
+          <div class="hardware" id="hardware">
+            <svg class="board-art" viewBox="0 0 2950 2900" aria-hidden="true">
+              <defs>
+                <linearGradient id="metal" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0" stop-color="#eef0f2" />
+                  <stop offset="0.5" stop-color="#b8bdc3" />
+                  <stop offset="1" stop-color="#8d939a" />
+                </linearGradient>
+              </defs>
+              <g transform="translate(200 760)">
+                <rect class="pcb" width="2700" height="2100" rx="70" />
+                <rect class="pcb-line" x="40" y="40" width="2620" height="2020" rx="45" />
+                <circle class="mount-hole" cx="600" cy="100" r="62" />
+                <circle class="mount-hole" cx="550" cy="2000" r="62" />
+                <circle class="mount-hole" cx="2600" cy="700" r="62" />
+                <circle class="mount-hole" cx="2600" cy="1800" r="62" />
+                <!-- USB-B and barrel jack overhang the left edge, as on the real board -->
+                <rect x="-190" y="380" width="580" height="480" rx="20" fill="url(#metal)" />
+                <rect x="-190" y="500" width="100" height="240" fill="#4a4f55" />
+                <rect x="-120" y="1450" width="560" height="380" rx="30" fill="#1b1b1b" />
+                <circle cx="-30" cy="1640" r="80" fill="#333" />
+                <!-- reset button -->
+                <rect x="170" y="150" width="200" height="200" rx="16" fill="#cfd3d6" />
+                <circle cx="270" cy="250" r="62" fill="#b8282e" />
+                <!-- USB chip, regulator, crystal, capacitors -->
+                <rect class="chip" x="560" y="460" width="240" height="240" rx="12" />
+                <rect class="chip" x="560" y="1100" width="200" height="160" rx="8" />
+                <rect x="900" y="1100" width="320" height="120" rx="60" fill="url(#metal)" />
+                <circle cx="660" cy="1660" r="105" fill="url(#metal)" />
+                <circle cx="910" cy="1660" r="105" fill="url(#metal)" />
+                <!-- ATmega328P, DIP-28 -->
+                <line class="chip-legs" x1="1100" y1="1335" x2="2500" y2="1335" />
+                <line class="chip-legs" x1="1100" y1="1685" x2="2500" y2="1685" />
+                <rect class="chip" x="1050" y="1350" width="1450" height="320" rx="14" />
+                <circle cx="1100" cy="1510" r="38" fill="#2e2e2e" />
+                <text class="chip-text" x="1775" y="1530">ATMEGA328P</text>
+                <!-- static onboard LEDs (L is a live part, see below) -->
+                <rect class="smd-dim" x="952" y="513" width="96" height="54" rx="8" />
+                <rect class="smd-dim" x="952" y="613" width="96" height="54" rx="8" />
+                <text class="silk" x="900" y="460" text-anchor="end">L</text>
+                <text class="silk" x="900" y="560" text-anchor="end">TX</text>
+                <text class="silk" x="900" y="660" text-anchor="end">RX</text>
+                <rect x="2290" y="520" width="120" height="80" rx="20" fill="#5cff7a" opacity="0.35" />
+                <rect x="2302" y="533" width="96" height="54" rx="8" fill="#5cff7a" />
+                <text class="silk" x="2440" y="580">ON</text>
+                <text class="silk silk-title" x="1900" y="420">DIGITAL (PWM~)</text>
+                <text class="silk silk-logo" x="1800" y="1000">UNO</text>
+              </g>
+              <!-- filled in by board-layout.js -->
+              <g id="board-headers" transform="translate(200 760)"></g>
+              <g id="board-wires"></g>
+            </svg>
+
+            <div class="part onboard" data-x="1200" data-y="1200">
+              <div id="led-l" class="led led-smd" data-pin="13" aria-hidden="true"></div>
+            </div>
+
+            <div class="part" data-x="700" data-y="600" data-wire="13" data-bend="740" data-wire-color="#e74c3c">
+              <span class="part-label">D13</span>
+              <span id="led-13-pwm" class="hint">PWM: 0</span>
               <div id="led-13" class="led" data-pin="13" aria-hidden="true"></div>
-              <div class="caption">Pin 13 (LED)</div>
-              <div id="led-13-pwm" class="hint">PWM: 0</div>
             </div>
-            <div class="led-block">
+
+            <div class="part" data-x="1150" data-y="600" data-wire="12" data-bend="670" data-wire-color="#f39c12">
+              <span class="part-label">D12</span>
+              <span id="led-12-pwm" class="hint">PWM: 0</span>
               <div id="led-12" class="led" data-pin="12" aria-hidden="true"></div>
-              <div class="caption">Pin 12 (LED)</div>
-              <div id="led-12-pwm" class="hint">PWM: 0</div>
             </div>
-            <div class="led-block">
+
+            <div class="part" data-x="1650" data-y="600" data-wire="8" data-wire-color="#f1c40f">
+              <span class="part-label">D8</span>
+              <span class="hint">Buzzer</span>
               <div id="buzzer-8" class="buzzer" data-pin="8" role="status">silent</div>
-              <div class="caption">Pin 8 (Buzzer)</div>
+            </div>
+
+            <div class="part" data-x="2150" data-y="600" data-wire="4" data-wire-color="#3498db">
+              <span class="part-label">D4</span>
+              <span id="switch-4-state" class="hint">LOW</span>
+              <label class="switch" title="Click to toggle">
+                <input id="switch-4" type="checkbox" />
+                <span class="switch-track" aria-hidden="true"></span>
+                <span class="sr-only">Switch (pin 4)</span>
+              </label>
+            </div>
+
+            <div class="part" data-x="2650" data-y="600" data-wire="2" data-wire-color="#2ecc71">
+              <span class="part-label">D2</span>
+              <span id="btn-2-state" class="hint">LOW</span>
+              <button id="btn-2" class="tact-btn" title="Hold to set HIGH">
+                <span class="sr-only">Button (pin 2)</span>
+              </button>
             </div>
           </div>
 
           <section class="section">
-            <h4>Pin States</h4>
-            <div id="pin-table"></div>
-          </section>
-
-          <section class="section">
-            <h4>Inputs</h4>
+            <h4>Analog Input</h4>
             <div class="inputs">
-              <div>
-                <div class="row">
-                  <button id="btn-2" class="btn secondary">
-                    Button (pin 2)
-                  </button>
-                  <div id="btn-2-state" class="hint">LOW</div>
-                </div>
-                <div class="hint">Hold to set HIGH</div>
-              </div>
-              <div>
-                <div class="row">
-                  <label class="switch">
-                    <input id="switch-4" type="checkbox" />
-                    <span class="switch-track" aria-hidden="true"></span>
-                    Switch (pin 4)
-                  </label>
-                  <div id="switch-4-state" class="hint">LOW</div>
-                </div>
-                <div class="hint">Click to toggle</div>
-              </div>
               <div class="analog-input">
-                <label for="slider-a0" class="input-label">Analog A0</label>
+                <label for="slider-a0" class="input-label">Potentiometer (A0)</label>
                 <div class="row">
                   <input
                     id="slider-a0"
@@ -100,6 +202,11 @@ void loop() {
                 </div>
               </div>
             </div>
+          </section>
+
+          <section class="section">
+            <h4>Pin States</h4>
+            <div id="pin-table"></div>
           </section>
 
           <section class="section">

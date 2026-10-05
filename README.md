@@ -1,40 +1,53 @@
 # Virtual Arduino Simulator
 
-A browser-based Arduino simulator. Write a sketch in Arduino-style C, press **Run**, and watch the LED, pin states and serial output react — no board or build tools needed.
-
-## Features
-
-- **Arduino-style sketches** — `setup()` / `loop()` with `int`, `float`, `bool` declarations and `for (int i = 0; ...)` loops.
-- **Digital I/O** — `pinMode`, `digitalWrite`, `digitalRead` with `INPUT`, `OUTPUT` and `INPUT_PULLUP`.
-- **Analog I/O** — `analogRead(A0)` returns 0–1023 from the on-screen slider; `analogWrite(pin, 0–255)` drives PWM.
-- **PWM LEDs** — LEDs on pins 13 and 12 (`#led-13`, `#led-12`) fade smoothly with the PWM value: opacity and a red glow scale with `analogWrite` duty (0–255), and `digitalWrite` gives full on/off.
-- **Buzzer** — a buzzer on pin 8 plays a 900 Hz tone and lights up with a pulsing ring while the pin is HIGH, and goes silent on LOW or when the sketch stops. Audio is enabled by the **Run** click, since browsers block sound until a user gesture. `BEEP` is also logged to the browser console each time it starts.
-- **Timing** — `delay(ms)` and `millis()`.
-- **Serial console** — `Serial.begin`, `Serial.print`, `Serial.println`.
-- **Inputs** — a push button on pin 2 (hold for HIGH), a toggle switch on pin 4 (on = HIGH, off = LOW) and an analog slider on A0.
-- **Extensible components** — output components are discovered from the HTML: add an element with `class="led"` (or `buzzer`), `id="led-<pin>"` and `data-pin="<pin>"` and it is driven automatically.
-- **Live pin table** — mode and value of every used pin, updated as the sketch runs.
-- **Safe execution** — sketches run in a Web Worker, so the page stays responsive. A sketch that blocks (e.g. `while (true) {}`) is stopped automatically after about one second with an error.
-- **Robust input handling** — out-of-range or invalid values (`NaN`, negative, too large) are clamped instead of crashing the simulator.
+A browser-based Arduino simulator that runs Arduino-style C sketches with no board, toolchain, or installation. Write a sketch, press **Run**, and watch LEDs, a buzzer, pin states, and serial output respond in real time on a virtual Arduino Uno.
 
 ## Live Demo
 
-https://arduino-simulator-zeta.vercel.app/
+**[arduino-simulator-zeta.vercel.app](https://arduino-simulator-zeta.vercel.app/)**
 
-## Getting started
+## Features
 
-The app uses ES modules and Web Workers, which browsers block on `file://` URLs. Serve the project root over HTTP (asset paths are root-relative, e.g. `/src/ui/ui.js`):
+### Core Simulation
+
+- **Arduino-style sketches** with `setup()` / `loop()`, `int` / `float` / `bool` declarations, and `for (int i = 0; ...)` loops
+- **Digital I/O** via `pinMode`, `digitalWrite`, and `digitalRead` with `INPUT`, `OUTPUT`, and `INPUT_PULLUP`
+- **Analog I/O** via `analogRead(A0)` (0–1023) and `analogWrite(pin, 0–255)` for PWM
+- **Timing** with `delay(ms)` and `millis()`
+- **Serial console** supporting `Serial.begin`, `Serial.print`, and `Serial.println`
+
+### Hardware UI
+
+- **Arduino Uno board** rendered in SVG, with pin holes at real Uno header positions and parts connected by jumper wires
+- **PWM LEDs** on pins 13 and 12 that fade smoothly with the duty cycle; the onboard **L** LED mirrors pin 13
+- **Buzzer** on pin 8 that plays a 900 Hz tone with a pulsing visual indicator while the pin is HIGH
+- **Inputs:** push button on pin 2 (hold for HIGH), toggle switch on pin 4, and a potentiometer slider on A0
+- **Live pin table** showing the mode and value of every pin in use
+- **Responsive layout** that stacks the editor and board on narrow screens
+
+### Developer Experience
+
+- **Code editor** with Arduino/C syntax highlighting, line numbers, and current-line highlight, built on a native `<textarea>` so editing, undo, and paste work as expected
+- **Safe execution** in a Web Worker keeps the page responsive; blocking sketches (e.g. `while (true) {}`) are stopped automatically after about one second
+- **Robust input handling** clamps invalid or out-of-range values (`NaN`, negative, too large) instead of crashing
+- **Extensible components** declared in HTML: any element with `class="led"` or `class="buzzer"` and `data-pin="<pin>"` is driven automatically, and wrapping it in a `.part` with `data-x`, `data-y`, and `data-wire` places and wires it on the board
+
+## Getting Started
+
+The app uses ES modules and Web Workers, which browsers block on `file://` URLs. Serve the project root over HTTP:
 
 ```bash
 cd arduino-simulator
 python3 -m http.server 8000
 ```
 
-Then open <http://localhost:8000> in a recent version of Chrome, Firefox, Safari or Edge.
+Then open [http://localhost:8000](http://localhost:8000) in a recent version of Chrome, Firefox, Safari, or Edge.
 
-## Example sketches
+> Asset paths are root-relative (e.g. `/src/ui/ui.js`), so the server must be started from the project root.
 
-**Blink**
+## Example Sketches
+
+### Blink
 
 ```cpp
 void setup() {
@@ -49,7 +62,7 @@ void loop() {
 }
 ```
 
-**Fade**
+### Fade
 
 ```cpp
 void setup() {}
@@ -62,7 +75,9 @@ void loop() {
 }
 ```
 
-**Potentiometer → LED brightness** (move the A0 slider)
+### Potentiometer to LED Brightness
+
+Move the A0 slider to change the LED brightness.
 
 ```cpp
 void setup() {
@@ -77,7 +92,9 @@ void loop() {
 }
 ```
 
-**Switch → LEDs and buzzer** (flip the pin 4 switch)
+### Switch to LEDs and Buzzer
+
+Flip the switch on pin 4 to toggle the outputs.
 
 ```cpp
 void setup() {
@@ -96,7 +113,7 @@ void loop() {
 }
 ```
 
-**Button**
+### Button
 
 ```cpp
 void setup() {
@@ -115,46 +132,56 @@ void loop() {
 
 ## Supported API
 
-| Function                         | Notes                                                                               |
-| -------------------------------- | ----------------------------------------------------------------------------------- |
-| `pinMode(pin, mode)`             | `INPUT`, `OUTPUT`, `INPUT_PULLUP` (pull-up pins read HIGH by default)               |
-| `digitalWrite(pin, value)`       | Pin must be `OUTPUT`, otherwise the write is ignored with a warning. Turns PWM off. |
-| `digitalRead(pin)`               | Returns `0` or `1`                                                                  |
-| `analogWrite(pin, value)`        | Value clamped to 0–255; sets the pin to `OUTPUT` automatically, as on real hardware |
-| `analogRead(pin)`                | `A0`–`A5`, `0`–`5` or `14`–`19`; returns 0–1023, or `0` for an invalid pin          |
-| `delay(ms)`                      |                                                                                     |
-| `millis()`                       | Milliseconds since the sketch started                                               |
-| `Serial.begin / print / println` | `begin` is accepted and ignored                                                     |
-| `HIGH`, `LOW`, `A0`–`A5`         |                                                                                     |
+| Function                         | Notes                                                                    |
+| -------------------------------- | ------------------------------------------------------------------------ |
+| `pinMode(pin, mode)`             | `INPUT`, `OUTPUT`, `INPUT_PULLUP` (pull-up pins read HIGH by default)    |
+| `digitalWrite(pin, value)`       | Requires `OUTPUT` mode, otherwise ignored with a warning; disables PWM   |
+| `digitalRead(pin)`               | Returns `0` or `1`                                                       |
+| `analogWrite(pin, value)`        | Clamped to 0–255; sets the pin to `OUTPUT` automatically                 |
+| `analogRead(pin)`                | Accepts `A0`–`A5`, `0`–`5`, or `14`–`19`; returns 0–1023 (`0` if invalid) |
+| `delay(ms)`                      | Pauses the sketch                                                        |
+| `millis()`                       | Milliseconds since the sketch started                                    |
+| `Serial.begin / print / println` | `begin` is accepted and ignored                                          |
+| `HIGH`, `LOW`, `A0`–`A5`         | Constants                                                                |
 
-## Project structure
+## Project Structure
 
 ```
-index.html                 Page layout; loads src/ui/ui.js as the single entry point
+index.html                 Page layout and single entry point (src/ui/ui.js)
 src/
   simulator/
     simulator.js           ArduinoSimulator: pin model, events, value validation
   runtime/
-    transform.js           Converts the Arduino-style sketch to JavaScript
-    runner.js              Starts/stops the worker and serves its pin requests
+    transform.js           Converts Arduino-style sketches to JavaScript
+    runner.js              Starts/stops the worker and serves pin requests
     worker-runner.js       Runs the sketch in a nested worker with a watchdog
   ui/
     ui.js                  Entry point: buttons, status, serial console
-    render.js              LED and pin-table rendering
-    controls.js            Push button (pin 2) and A0 slider
+    editor.js              Syntax-highlighted code editor
+    board-layout.js        Uno board drawing, part placement, and wiring
+    render.js              LED, buzzer, and pin-table rendering
+    controls.js            Push button, toggle switch, and A0 slider
+    audio.js               Buzzer tone generation (Web Audio)
     style.css              Styles
 ```
 
-The three layers depend in one direction only: `ui` → `runtime` → `simulator`. The simulator has no DOM code, and the transform is a pure function, so both can be used and tested on their own.
+The architecture is layered with one-way dependencies: `ui` → `runtime` → `simulator`. The simulator contains no DOM code and the transform is a pure function, so both can be used and tested independently.
 
-## How it works
+## How It Works
 
-The sketch is converted to JavaScript with a few simple text rules, not a full C++ compiler: `void setup()` / `void loop()` become `async` functions, declarations become `let`, and `delay`, `digitalRead`, `analogRead` and `millis` calls get an `await`. The converted code runs inside the worker. Each pin operation is sent as a message to the main thread, where `ArduinoSimulator` updates the pin state and fires events (`pinChanged`, `analogChanged`, `modeChanged`, `serial`) that the UI listens to.
+1. **Transform.** The sketch is converted to JavaScript using lightweight text rules rather than a full C++ compiler. `setup()` and `loop()` become `async` functions, declarations become `let`, and blocking calls (`delay`, `digitalRead`, `analogRead`, `millis`) are awaited.
+2. **Execute.** The converted code runs inside a Web Worker, guarded by a watchdog that stops sketches that block.
+3. **Simulate.** Each pin operation is sent to the main thread, where `ArduinoSimulator` updates pin state and emits events (`pinChanged`, `analogChanged`, `modeChanged`, `serial`).
+4. **Render.** The UI subscribes to these events and updates the board, components, pin table, and serial console.
 
 ## Limitations
 
-- **Simple conversion rules, not a compiler.** Only common sketch patterns are recognized.
-- **Only `setup()` and `loop()` are converted.** Helper functions such as `int readSensor() { ... }` are not converted, and calling `delay` or `digitalRead` inside them fails.
-- **Limited types outside `for` loops.** Only `int`, `float` and `bool` declarations are converted. `long`, `unsigned long`, `byte`, `String` and arrays are not converted yet.
-- **One LED and fixed inputs.** The only output on screen is the LED on pin 13. The only inputs are the button on pin 2 and the slider on A0.
-- **Timing is approximate.** It follows browser timers, not real hardware clock speed.
+- **Not a full compiler.** Only common sketch patterns are recognized.
+- **Only `setup()` and `loop()` are converted.** Helper functions (e.g. `int readSensor() { ... }`) are not, and calling `delay` or `digitalRead` inside them fails.
+- **Limited types.** Outside `for` loops, only `int`, `float`, and `bool` declarations are supported; `long`, `unsigned long`, `byte`, `String`, and arrays are not yet supported.
+- **Fixed on-screen components.** Outputs are the LEDs on pins 13 and 12 and the buzzer on pin 8; inputs are the button on pin 2, the switch on pin 4, and the slider on A0.
+- **Approximate timing.** Timing follows browser timers, not real hardware clock speed.
+
+## Motivation
+
+Getting started with Arduino usually requires a physical board, components, and a local toolchain. This project removes that barrier: anyone can write, run, and experiment with Arduino sketches directly in the browser. It also served as a hands-on exercise in building a layered simulation engine, running untrusted code safely in Web Workers, and translating a C-like language into JavaScript.
