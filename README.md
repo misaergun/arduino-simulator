@@ -15,9 +15,13 @@ A browser-based Arduino simulator. Write a sketch in Arduino-style C, press **Ru
 - **Safe execution** — sketches run in a Web Worker, so the page stays responsive. A sketch that blocks (e.g. `while (true) {}`) is stopped automatically after about one second with an error.
 - **Robust input handling** — out-of-range or invalid values (`NaN`, negative, too large) are clamped instead of crashing the simulator.
 
+## Live Demo
+
+https://arduino-simulator-zeta.vercel.app/
+
 ## Getting started
 
-The app uses ES modules and Web Workers, which browsers block on `file://` URLs. Serve the folder over HTTP:
+The app uses ES modules and Web Workers, which browsers block on `file://` URLs. Serve the project root over HTTP (asset paths are root-relative, e.g. `/src/ui/ui.js`):
 
 ```bash
 cd arduino-simulator
@@ -90,28 +94,39 @@ void loop() {
 
 ## Supported API
 
-| Function | Notes |
-|---|---|
-| `pinMode(pin, mode)` | `INPUT`, `OUTPUT`, `INPUT_PULLUP` (pull-up pins read HIGH by default) |
-| `digitalWrite(pin, value)` | Pin must be `OUTPUT`, otherwise the write is ignored with a warning. Turns PWM off. |
-| `digitalRead(pin)` | Returns `0` or `1` |
-| `analogWrite(pin, value)` | Value clamped to 0–255; sets the pin to `OUTPUT` automatically, as on real hardware |
-| `analogRead(pin)` | `A0`–`A5`, `0`–`5` or `14`–`19`; returns 0–1023, or `0` for an invalid pin |
-| `delay(ms)` | |
-| `millis()` | Milliseconds since the sketch started |
-| `Serial.begin / print / println` | `begin` is accepted and ignored |
-| `HIGH`, `LOW`, `A0`–`A5` | |
+| Function                         | Notes                                                                               |
+| -------------------------------- | ----------------------------------------------------------------------------------- |
+| `pinMode(pin, mode)`             | `INPUT`, `OUTPUT`, `INPUT_PULLUP` (pull-up pins read HIGH by default)               |
+| `digitalWrite(pin, value)`       | Pin must be `OUTPUT`, otherwise the write is ignored with a warning. Turns PWM off. |
+| `digitalRead(pin)`               | Returns `0` or `1`                                                                  |
+| `analogWrite(pin, value)`        | Value clamped to 0–255; sets the pin to `OUTPUT` automatically, as on real hardware |
+| `analogRead(pin)`                | `A0`–`A5`, `0`–`5` or `14`–`19`; returns 0–1023, or `0` for an invalid pin          |
+| `delay(ms)`                      |                                                                                     |
+| `millis()`                       | Milliseconds since the sketch started                                               |
+| `Serial.begin / print / println` | `begin` is accepted and ignored                                                     |
+| `HIGH`, `LOW`, `A0`–`A5`         |                                                                                     |
+
+## Project structure
+
+```
+index.html                 Page layout; loads src/ui/ui.js as the single entry point
+src/
+  simulator/
+    simulator.js           ArduinoSimulator: pin model, events, value validation
+  runtime/
+    transform.js           Converts the Arduino-style sketch to JavaScript
+    runner.js              Starts/stops the worker and serves its pin requests
+    worker-runner.js       Runs the sketch in a nested worker with a watchdog
+  ui/
+    ui.js                  Entry point: buttons, status, serial console
+    render.js              LED and pin-table rendering
+    controls.js            Push button (pin 2) and A0 slider
+    style.css              Styles
+```
+
+The three layers depend in one direction only: `ui` → `runtime` → `simulator`. The simulator has no DOM code, and the transform is a pure function, so both can be used and tested on their own.
 
 ## How it works
-
-| File | Role |
-|---|---|
-| `index.html` | Page layout: editor, LED, pin table, inputs, serial console |
-| `ui.js` | Button wiring, LED and pin-table rendering, input controls |
-| `runner.js` | Converts the sketch to JavaScript (`transform`) and talks to the worker |
-| `worker-runner.js` | Runs the sketch in a nested worker and stops it if it stops responding |
-| `simulator.js` | Pin model (`ArduinoSimulator`): pin state, events, value validation |
-| `style.css` | Styles |
 
 The sketch is converted to JavaScript with a few simple text rules, not a full C++ compiler: `void setup()` / `void loop()` become `async` functions, declarations become `let`, and `delay`, `digitalRead`, `analogRead` and `millis` calls get an `await`. The converted code runs inside the worker. Each pin operation is sent as a message to the main thread, where `ArduinoSimulator` updates the pin state and fires events (`pinChanged`, `analogChanged`, `modeChanged`, `serial`) that the UI listens to.
 

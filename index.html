@@ -3,8 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <title>Virtual Arduino Simulator</title>
-
-    <link rel="stylesheet" href="./style.css" />
+    <link rel="stylesheet" href="/src/ui/style.css" />
   </head>
   <body>
     <div class="app">
@@ -12,7 +11,7 @@
 
       <div class="workspace">
         <div class="editor-panel">
-          <label><strong>Sketch</strong></label>
+          <label for="code"><strong>Sketch</strong></label>
           <textarea id="code">
 void setup() {
   pinMode(13, OUTPUT);
@@ -36,53 +35,38 @@ void loop() {
             <button class="btn secondary small" id="copyCodeBtn">
               Copy Code
             </button>
-            <div style="flex: 1"></div>
+            <div class="spacer"></div>
             <div class="status" id="status">Status: Stopped</div>
           </div>
         </div>
 
         <div class="sim-panel">
-          <div style="text-align: center">
+          <div class="led-block">
             <div id="led" class="led" aria-hidden="true"></div>
-            <div style="font-size: 13px; color: var(--muted)">Pin 13 (LED)</div>
-            <div id="led-pwm" style="font-size: 12px; color: var(--muted)">
-              PWM: 0
-            </div>
+            <div class="caption">Pin 13 (LED)</div>
+            <div id="led-pwm" class="hint">PWM: 0</div>
           </div>
 
-          <div style="margin-top: 12px">
-            <h4 style="margin: 0 0 8px">Pin States</h4>
+          <section class="section">
+            <h4>Pin States</h4>
             <div id="pin-table"></div>
-          </div>
-          <div style="margin-top: 12px">
-            <h4 style="margin: 0 0 8px">Inputs</h4>
-            <div style="display: flex; gap: 12px; align-items: center">
+          </section>
+
+          <section class="section">
+            <h4>Inputs</h4>
+            <div class="inputs">
               <div>
-                <div style="display: flex; gap: 8px; align-items: center">
+                <div class="row">
                   <button id="btn-2" class="btn secondary">
                     Button (pin 2)
                   </button>
-                  <div
-                    id="btn-2-state"
-                    style="font-size: 12px; color: var(--muted)"
-                  >
-                    LOW
-                  </div>
+                  <div id="btn-2-state" class="hint">LOW</div>
                 </div>
-                <div style="font-size: 12px; color: var(--muted)">
-                  Hold to set HIGH
-                </div>
+                <div class="hint">Hold to set HIGH</div>
               </div>
-              <div
-                style="
-                  display: flex;
-                  flex-direction: column;
-                  gap: 6px;
-                  margin-left: 14px;
-                "
-              >
-                <label style="font-size: 13px; margin: 0">Analog A0</label>
-                <div style="display: flex; gap: 8px; align-items: center">
+              <div class="analog-input">
+                <label for="slider-a0" class="input-label">Analog A0</label>
+                <div class="row">
                   <input
                     id="slider-a0"
                     type="range"
@@ -90,36 +74,20 @@ void loop() {
                     max="1023"
                     value="0"
                   />
-                  <div
-                    id="a0-val"
-                    style="
-                      width: 42px;
-                      font-size: 12px;
-                      color: var(--muted);
-                      text-align: right;
-                    "
-                  >
-                    0
-                  </div>
+                  <div id="a0-val" class="hint slider-value">0</div>
                 </div>
               </div>
             </div>
-          </div>
+          </section>
 
-          <div style="margin-top: 12px">
-            <h4 style="margin: 0 0 8px">Serial Console</h4>
+          <section class="section">
+            <h4>Serial Console</h4>
             <div id="serial"></div>
-          </div>
+          </section>
         </div>
       </div>
     </div>
 
-    <script type="module">
-      import { wireButtons } from "./ui.js";
-
-      document.addEventListener("DOMContentLoaded", () => {
-        wireButtons();
-      });
-    </script>
+    <script type="module" src="/src/ui/ui.js"></script>
   </body>
 </html>

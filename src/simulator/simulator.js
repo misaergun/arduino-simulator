@@ -1,4 +1,4 @@
-// simulator.js
+const VALID_MODES = ["INPUT", "OUTPUT", "INPUT_PULLUP"];
 
 // Convert anything (undefined, NaN, Infinity, strings) to an integer in [min, max].
 function toSafeInt(raw, min, max) {
@@ -7,96 +7,84 @@ function toSafeInt(raw, min, max) {
   return Math.max(min, Math.min(max, Math.round(n)));
 }
 
+function createPin() {
+  return { mode: "INPUT", value: 0, pwm: 0, analogValue: 0 };
+}
+
+/**
+ * Pin-level model of an Arduino board. Holds pin state and emits events
+ * (`pinChanged`, `modeChanged`, `analogChanged`, `analogInputChanged`,
+ * `serial`, `warning`) whenever that state changes.
+ *
+ * Digital pins are keyed by their number ("0".."13"), analog inputs by "A<n>".
+ */
 export class ArduinoSimulator {
   constructor({ digitalPins = 14, analogBase = 14 } = {}) {
     this._events = new EventTarget();
     this._startTime = performance.now();
-
-    // internal pin model: keys are string numbers
     this._pins = new Map();
-    this._digitalCount = digitalPins;
     this._analogBase = analogBase;
-    
 
-    for (let i = 0; i < this._digitalCount; i++) {
-      this._pins.set(String(i), {
-        mode: "INPUT",
-        value: 0,
-        pwm: 0,
-        analogValue: 0,
-      });
+    for (let i = 0; i < digitalPins; i++) {
+      this._pins.set(String(i), createPin());
     }
   }
 
-  // Event helpers
   on(name, fn) {
     this._events.addEventListener(name, fn);
   }
+
   off(name, fn) {
     this._events.removeEventListener(name, fn);
   }
+
   _emit(name, detail) {
     try {
       this._events.dispatchEvent(new CustomEvent(name, { detail }));
     } catch (e) {
-      // swallow
+      // a failing listener must never break the simulation
     }
   }
 
-  // Pure logic methods
   _ensurePin(key) {
     const k = String(key);
-    if (!this._pins.has(k))
-      this._pins.set(k, { mode: "INPUT", value: 0, pwm: 0, analogValue: 0 });
+    if (!this._pins.has(k)) this._pins.set(k, createPin());
     return this._pins.get(k);
   }
 
-  // Returns a shallow copy of pin state
+  /** Returns a copy of a pin's state (defaults for unknown pins). */
   getPin(pin) {
     const p = this._pins.get(String(pin));
-    if (!p) return { mode: "INPUT", value: 0, pwm: 0, analogValue: 0 };
-    return {
-      mode: p.mode,
-      value: p.value,
-      pwm: p.pwm,
-      analogValue: p.analogValue,
-    };
+    return p ? { ...p } : createPin();
   }
 
-  digitalRead(pin) {
-    const p = this._pins.get(String(pin));
-    return p ? (p.value ? 1 : 0) : 0;
-  }
-
-  // Forcefully set a pin value (used for inputs from UI)
-  setPinValue(pin, value) {
-    const p = this._ensurePin(pin);
-    const v = value ? 1 : 0;
-    const old = p.value;
-    if (old === v) return; // avoid event spam
-    p.value = v;
-    this._emit("pinChanged", { pin: String(pin), value: v, mode: p.mode });
+  /** Returns a copy of every pin's state, keyed by pin name. */
+  snapshotPins() {
+    const out = {};
+    for (const [k, v] of this._pins.entries()) out[k] = { ...v };
+    return out;
   }
 
   pinMode(pin, mode) {
     const p = this._ensurePin(pin);
     const m = String(mode).toUpperCase();
-    if (m !== "INPUT" && m !== "OUTPUT" && m !== "INPUT_PULLUP") {
+    if (!VALID_MODES.includes(m)) {
       throw new Error("Invalid mode: " + String(mode));
     }
-    if (p.mode === m) return; // no change
+    if (p.mode === m) return;
     p.mode = m;
-    if (
-      m === "INPUT_PULLUP" &&
-      (p.value === 0 || typeof p.value === "undefined")
-    )
-      p.value = 1;
+    if (m === "INPUT_PULLUP" && !p.value) p.value = 1;
     this._emit("modeChanged", { pin: String(pin), mode: m });
+  }
+
+  digitalRead(pin) {
+    const p = this._pins.get(String(pin));
+    return p && p.value ? 1 : 0;
   }
 
   digitalWrite(pin, value) {
     const p = this._ensurePin(pin);
-    if (String(p.mode).toUpperCase() !== "OUTPUT") {
+    if (p.mode !== "OUTPUT") {
       const msg = `digitalWrite on non-OUTPUT pin ${pin}`;
       this._emit("warning", { message: msg, pin: String(pin) });
       console.warn(msg);
@@ -110,6 +98,15 @@ export class ArduinoSimulator {
     this._emit("pinChanged", { pin: String(pin), value: v, mode: p.mode });
   }
 
+  /** Sets a pin's value from outside the sketch (e.g. a UI button). */
+  setPinValue(pin, value) {
+    const p = this._ensurePin(pin);
+    const v = value ? 1 : 0;
+    if (p.value === v) return;
+    p.value = v;
+    this._emit("pinChanged", { pin: String(pin), value: v, mode: p.mode });
+  }
+
   analogWrite(pin, raw) {
     const p = this._ensurePin(pin);
     const v = toSafeInt(raw, 0, 255);
@@ -119,13 +116,12 @@ export class ArduinoSimulator {
       this._emit("modeChanged", { pin: String(pin), mode: p.mode });
     }
     const newVal = v > 0 ? 1 : 0;
-    if (p.pwm === v && p.value === newVal) return; // no change
+    if (p.pwm === v && p.value === newVal) return;
     p.pwm = v;
     if (p.value !== newVal) {
       p.value = newVal;
       this._emit("pinChanged", { pin: String(pin), value: p.value, mode: p.mode });
     }
-    // `pwm` kept for backward compatibility
     this._emit("analogChanged", {
       pin: String(pin),
       value: v,
@@ -134,30 +130,26 @@ export class ArduinoSimulator {
     });
   }
 
+  /** Sets an analog input reading (0..1023) from outside the sketch. Pin must be "A<n>". */
   setAnalogValue(pin, value) {
-    // Accept only A<n> strings for analog inputs
-    const s = String(pin).toUpperCase();
-    const m = /^A(\d+)$/i.exec(s);
+    const m = /^A(\d+)$/i.exec(String(pin));
     if (!m) throw new Error("setAnalogValue requires analog pin like 'A0'");
     const key = `A${Number(m[1])}`;
     const v = toSafeInt(value, 0, 1023);
     const p = this._ensurePin(key);
-    const old = p.analogValue;
-    if (old === v) return;
+    if (p.analogValue === v) return;
     p.analogValue = v;
-    this._emit("analogInputChanged", { pin: String(key), value: v });
+    this._emit("analogInputChanged", { pin: key, value: v });
   }
 
+  /** Accepts "A0".."An", channel numbers 0..5, or board numbers (14 = A0). */
   analogRead(pin) {
-    // Accepts 'A0'..'An', channel numbers 0..5, or board numbers (14 = A0).
     let key = null;
     const m = /^A(\d+)$/i.exec(String(pin).trim());
-    if (m) key = `A${Number(m[1])}`;
-    else {
-      const n = typeof pin === "number" ? pin : NaN;
-      if (Number.isInteger(n) && n >= 0) {
-        key = `A${n >= this._analogBase ? n - this._analogBase : n}`;
-      }
+    if (m) {
+      key = `A${Number(m[1])}`;
+    } else if (typeof pin === "number" && Number.isInteger(pin) && pin >= 0) {
+      key = `A${pin >= this._analogBase ? pin - this._analogBase : pin}`;
     }
     if (!key) {
       this._emit("warning", { message: `analogRead on invalid pin ${pin}` });
@@ -167,33 +159,11 @@ export class ArduinoSimulator {
     return p ? toSafeInt(p.analogValue, 0, 1023) : 0;
   }
 
-  _toAnalogKey(pin) {
-    // Deprecated: prefer explicit 'A#' strings
-    const s = String(pin).toUpperCase();
-    const m = /^A(\d+)$/i.exec(s);
-    if (m) return `A${Number(m[1])}`;
-    if (!isNaN(Number(pin))) return String(Number(pin));
-    return s;
-  }
-
   millis() {
     return Math.floor(performance.now() - this._startTime);
   }
 
   serialPrint(text) {
     this._emit("serial", { text: String(text) });
-  }
-
-  // Export a snapshot of all pins for UI rendering
-  snapshotPins() {
-    const out = {};
-    for (const [k, v] of this._pins.entries())
-      out[k] = {
-        mode: v.mode,
-        value: v.value,
-        pwm: v.pwm,
-        analogValue: v.analogValue,
-      };
-    return out;
   }
 }

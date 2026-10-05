@@ -1,5 +1,3 @@
-// worker-runner.js
-//
 // Outer worker: runs the user's sketch inside a nested subworker so that a
 // blocking (infinite) loop can be detected and terminated from here.
 
@@ -8,10 +6,6 @@ let nextId = 1;
 let subworker = null;
 let subworkerUrl = null;
 let watchdog = null;
-
-try {
-  postMessage({ type: "worker-ready" });
-} catch (e) {}
 
 onmessage = (ev) => {
   const msg = ev.data;
@@ -27,7 +21,7 @@ onmessage = (ev) => {
   }
 
   if (msg.type === "start") {
-    startSubworker(msg.code || "", msg.config || msg.opts || {});
+    startSubworker(msg.code || "", msg.config || {});
     return;
   }
 
@@ -36,11 +30,11 @@ onmessage = (ev) => {
   }
 };
 
-function startSubworker(code, opts) {
+function startSubworker(code, config) {
   cleanup();
 
   // Max time the subworker may go without responding (blocking loop).
-  const maxBlockMs = opts.maxBlockMs || opts.tickWarnMs || 5000;
+  const maxBlockMs = config.maxBlockMs || 5000;
 
   const subSrc = `
     const userCode = ${JSON.stringify(code)};
@@ -115,17 +109,11 @@ function startSubworker(code, opts) {
 
         postMessage({ type: 'started' });
 
-        if (result.setup) {
-          postMessage({ type: 'setup:start' });
-          await result.setup();
-        }
-        postMessage({ type: 'setup:done' });
+        if (result.setup) await result.setup();
 
         while (true) {
           const start = performance.now();
-          if (result.loop) {
-            await result.loop();
-          }
+          if (result.loop) await result.loop();
           const duration = Math.round(performance.now() - start);
           postMessage({ type: 'tick', duration });
 

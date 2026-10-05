@@ -128,13 +128,63 @@ textarea#code {
   border-radius: 6px;
 }
 
-.meta-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-top: 8px;
-}
 .status {
   font-size: 13px;
   color: var(--muted);
+}
+
+.spacer {
+  flex: 1;
+}
+
+.section {
+  margin-top: 12px;
+}
+.section h4 {
+  margin: 0 0 8px;
+}
+
+.led-block {
+  text-align: center;
+}
+.caption {
+  font-size: 13px;
+  color: var(--muted);
+}
+.hint {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.inputs {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+.analog-input {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-left: 14px;
+}
+.input-label {
+  font-size: 13px;
+  margin: 0;
+}
+.slider-value {
+  width: 42px;
+  text-align: right;
+}
+
+.warning-banner {
+  background: #fff3cd;
+  color: #856404;
+  padding: 8px;
+  border-radius: 4px;
+  margin: 8px 0;
 }
